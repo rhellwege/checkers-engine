@@ -72,13 +72,11 @@ class CheckersBoard:
         if self.board[r][c].lower() != self.to_move:
             return []
 
-        # Jump moves are forced
-        jumps = self._get_jumps_for_piece(r, c)
-        if jumps:
-            return jumps
+        moves = self.get_possible_moves()
+        # filter
+        moves = [move for move in moves if move.path[0] == (r, c)]
 
-        regulars = self._get_regular_moves_for_piece(r, c)
-        return regulars
+        return moves
 
     def _get_jumps_for_piece(self, r, c):
         moves = []

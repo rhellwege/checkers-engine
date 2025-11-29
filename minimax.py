@@ -1,8 +1,11 @@
 from copy import deepcopy
+
 from board import CheckersBoard, Move
 
 
-def minimax(board: CheckersBoard, depth: int, alpha: float, beta: float, maximizing: bool):
+def minimax(
+    board: CheckersBoard, depth: int, alpha: float, beta: float, maximizing: bool
+):
     """
     Minimaxes the current board and returns (best_score, best_move).
     """
@@ -15,7 +18,7 @@ def minimax(board: CheckersBoard, depth: int, alpha: float, beta: float, maximiz
     if not possible_moves:
         return (board.eval(), None)
 
-    # maximizing player (r) 
+    # maximizing player (r)
     if maximizing:
         best_value = float("-inf")
         best_move = None
@@ -33,11 +36,11 @@ def minimax(board: CheckersBoard, depth: int, alpha: float, beta: float, maximiz
             # alpha-beta pruning for efficiency
             alpha = max(alpha, best_value)
             if beta <= alpha:
-                break  
+                break
 
         return best_value, best_move
 
-    # minimizing player (b) 
+    # minimizing player (b)
     else:
         best_value = float("inf")
         best_move = None
@@ -64,11 +67,11 @@ def get_best_move(board: CheckersBoard, depth: int = 5):
     Returns the best move for the player that is going to play.
     """
     is_red_to_move = board.to_move == "r"
-    _, best_move = minimax(
+    eval, best_move = minimax(
         board,
         depth,
         alpha=float("-inf"),
         beta=float("inf"),
         maximizing=is_red_to_move,
     )
-    return best_move
+    return eval, best_move

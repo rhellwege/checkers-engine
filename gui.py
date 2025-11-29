@@ -57,7 +57,7 @@ class CheckersGUI:
         self.status_label.config(text="AI is thinking...")
         self.root.update_idletasks()
 
-        best_move = get_best_move(self.board, self.ai_depth)
+        _, best_move = get_best_move(self.board, self.ai_depth)
         if best_move is not None:
             self.board.execute_move(best_move)
 
@@ -100,9 +100,7 @@ class CheckersGUI:
             y1 = row * self.square_size
             x2 = x1 + self.square_size
             y2 = y1 + self.square_size
-            self.canvas.create_rectangle(
-                x1, y1, x2, y2, outline="yellow", width=3
-            )
+            self.canvas.create_rectangle(x1, y1, x2, y2, outline="yellow", width=3)
 
         # Mark valid destination squares for the selected piece
         for move in self.valid_moves:
@@ -213,6 +211,8 @@ class CheckersGUI:
         else:
             self.status_label.config(text="Black's turn")
 
+        eval, best_move = get_best_move(self.board, self.ai_depth)
+        self.status_label.config(text=f"Best move: {best_move}, Evaluation: {eval}")
         moves = self.board.get_possible_moves()
         if not moves:
             winner = "Black" if self.board.to_move == "r" else "Red"
@@ -226,11 +226,9 @@ class CheckersGUI:
 
 if __name__ == "__main__":
     # Default it is: human (red) vs AI (black)
-    game = CheckersGUI(ai_enabled=True, ai_depth=5)
+    game = CheckersGUI(ai_enabled=True, ai_depth=10)
     game.run()
 
     # if you want to do a human vs human game you can  do:
     # game = CheckersGUI(ai_enabled=False)
     # game.run()
-
-
