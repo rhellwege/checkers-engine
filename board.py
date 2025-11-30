@@ -185,6 +185,12 @@ class CheckersBoard:
     def __str__(self):
         return "\n".join([" ".join(row) for row in self.board])
 
+    def __eq__(self, other):
+        return isinstance(other, CheckersBoard) and self.board == other.board
+
+    def __hash__(self):
+        return hash((tuple(map(tuple, self.board)), self.to_move))
+
     def eval(self):
         score = 0
         for row in self.board:
@@ -193,6 +199,20 @@ class CheckersBoard:
                     score += 1
                 elif cell == "b":
                     score -= 1
+                elif cell == "R":
+                    score += 3
+                elif cell == "B":
+                    score -= 3
+        return score
+
+    def smart_eval(self):
+        score = 0
+        for r, row in enumerate(self.board):
+            for c, cell in enumerate(row):
+                if cell == "r":
+                    score += 1 + (7 - r) * 0.1
+                elif cell == "b":
+                    score -= 1 + r * 0.1
                 elif cell == "R":
                     score += 3
                 elif cell == "B":

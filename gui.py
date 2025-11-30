@@ -1,4 +1,5 @@
 import tkinter as tk
+from time import perf_counter
 
 from board import CheckersBoard
 from minimax import get_best_move
@@ -23,21 +24,115 @@ class CheckersGUI:
         self.ai_depth = ai_depth
         self.ai_plays_black = True  # human = red, AI = black
 
+        # --- Stats ---
+        self.stats = {
+            "ai_depth": self.ai_depth,
+            "branching_factor": 0,
+            "avg_branching_factor": 0.0,
+            "current_eval": 0.0,
+            "ai_eval": 0.0,
+            "move_time": 0.0,
+            "explored_states": 0,
+        }
+        self.branching_factor_history = []
+        self.human_best_move = None
+
         self.root = tk.Tk()
         self.root.title("Checkers")
         self.root.resizable(False, False)
+        self.show_best_move = tk.BooleanVar()
+        self.eval_function_name = tk.StringVar(value="Simple Eval")
 
+        # Main frame
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas for the board
         canvas_size = 8 * self.square_size
-        self.canvas = tk.Canvas(self.root, width=canvas_size, height=canvas_size)
-        self.canvas.pack()
+        self.canvas = tk.Canvas(main_frame, width=canvas_size, height=canvas_size)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.canvas.bind("<Button-1>", self.on_click)
+
+        # Stats panel
+        stats_frame = tk.Frame(main_frame, padx=10, pady=10)
+        stats_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        self._init_stats_panel(stats_frame)
 
         self.status_label = tk.Label(self.root, text="Red's turn", font=("Arial", 12))
         self.status_label.pack(pady=5)
 
+        self.update_game_state()
         self.draw_board()
 
-        # If AI starts  let it move.
+        # If AI starts, let it move.
+        if self.ai_enabled and self.is_ai_turn():
+            self.root.after(500, self.make_ai_move)
+
+    def _init_stats_panel(self, parent: tk.Frame):
+        """Creates the labels for the stats panel."""
+        tk.Label(parent, text="--- Statistics ---", font=("Arial", 12, "bold")).pack(
+            anchor="w"
+        )
+
+        self.stats_labels = {
+            "ai_depth": tk.Label(parent, text=f"AI Depth: {self.ai_depth}"),
+            "branching_factor": tk.Label(parent, text="Branching Factor: N/A"),
+            "avg_branching_factor": tk.Label(parent, text="Avg Branching Factor: N/A"),
+            "current_eval": tk.Label(parent, text="Current Eval: N/A"),
+            "ai_eval": tk.Label(parent, text="AI Eval: N/A"),
+            "move_time": tk.Label(parent, text="Last Move Time: N/A"),
+            "explored_states": tk.Label(parent, text="Explored States: N/A"),
+        }
+
+        for label in self.stats_labels.values():
+            label.pack(anchor="w")
+
+        # Best move checkbox
+        tk.Checkbutton(
+            parent,
+            text="Show Best Move",
+            variable=self.show_best_move,
+            onvalue=True,
+            offvalue=False,
+            command=self.draw_board,
+        ).pack(anchor="w", pady=5)
+
+        # Reset button
+        tk.Button(parent, text="Reset Game", command=self.reset_game).pack(
+            anchor="w", pady=10
+        )
+
+        # Eval function dropdown
+        tk.Label(parent, text="Evaluation Function:", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(10, 0)
+        )
+        tk.OptionMenu(
+            parent, self.eval_function_name, "Simple Eval", "Smart Eval"
+        ).pack(anchor="w")
+
+    def reset_game(self):
+        """Resets the game to its initial state."""
+        self.board = CheckersBoard()
+        self.selected_square = None
+        self.valid_moves = []
+
+        # Reset stats
+        self.stats = {
+            "ai_depth": self.ai_depth,
+            "branching_factor": 0,
+            "avg_branching_factor": 0.0,
+            "current_eval": 0.0,
+            "ai_eval": 0.0,
+            "move_time": 0.0,
+            "explored_states": 0,
+        }
+        self.branching_factor_history = []
+        self.human_best_move = None
+
+        self.update_game_state()
+        self.draw_board()
+
+        # If AI starts, let it move.
         if self.ai_enabled and self.is_ai_turn():
             self.root.after(500, self.make_ai_move)
 
@@ -57,13 +152,27 @@ class CheckersGUI:
         self.status_label.config(text="AI is thinking...")
         self.root.update_idletasks()
 
-        _, best_move = get_best_move(self.board, self.ai_depth)
+        eval_func = (
+            CheckersBoard.smart_eval
+            if self.eval_function_name.get() == "Smart Eval"
+            else CheckersBoard.eval
+        )
+
+        start_time = perf_counter()
+        ai_eval, best_move, explored_states = get_best_move(
+            self.board, self.ai_depth, eval_func=eval_func
+        )
+        end_time = perf_counter()
+
         if best_move is not None:
             self.board.execute_move(best_move)
+            self.stats["ai_eval"] = ai_eval
+            self.stats["move_time"] = end_time - start_time
+            self.stats["explored_states"] = explored_states
 
         self.selected_square = None
         self.valid_moves = []
-        self.update_status()
+        self.update_game_state()
         self.draw_board()
 
     # Drawing ---------------
@@ -114,6 +223,23 @@ class CheckersGUI:
             self.canvas.create_oval(
                 x1 + 6, y1 + 6, x2 - 6, y2 - 6, outline="green", width=3
             )
+
+        # Show best move for human
+        if self.show_best_move.get() and self.human_best_move:
+            self._draw_best_move_arrow(self.human_best_move)
+
+    def _draw_best_move_arrow(self, move):
+        start_row, start_col = move.start
+        end_row, end_col = move.end
+
+        x1 = start_col * self.square_size + self.square_size // 2
+        y1 = start_row * self.square_size + self.square_size // 2
+        x2 = end_col * self.square_size + self.square_size // 2
+        y2 = end_row * self.square_size + self.square_size // 2
+
+        self.canvas.create_line(
+            x1, y1, x2, y2, arrow=tk.LAST, fill="blue", width=3, dash=(4, 4)
+        )
 
     def _draw_piece(self, row: int, col: int, piece: str):
         x1 = col * self.square_size
@@ -184,7 +310,7 @@ class CheckersGUI:
                 self.board.execute_move(move)
                 self.selected_square = None
                 self.valid_moves = []
-                self.update_status()
+                self.update_game_state()
                 self.draw_board()
 
                 # After human move, let AI respond if enabled
@@ -205,18 +331,80 @@ class CheckersGUI:
 
     # Status / game over ----------
 
-    def update_status(self):
+    def update_game_state(self):
+        """
+        Updates all game-state related information and stats.
+        """
+        # Update turn status label
         if self.board.to_move == "r":
             self.status_label.config(text="Red's turn")
         else:
             self.status_label.config(text="Black's turn")
 
-        eval, best_move = get_best_move(self.board, self.ai_depth)
-        self.status_label.config(text=f"Best move: {best_move}, Evaluation: {eval}")
+        # Check for game over
         moves = self.board.get_possible_moves()
         if not moves:
             winner = "Black" if self.board.to_move == "r" else "Red"
             self.status_label.config(text=f"{winner} wins!")
+            self.human_best_move = None
+        else:
+            # Pre-calculate human's best move if it's their turn
+            if not self.is_ai_turn():
+                eval_func = (
+                    CheckersBoard.smart_eval
+                    if self.eval_function_name.get() == "Smart Eval"
+                    else CheckersBoard.eval
+                )
+                _, self.human_best_move, _ = get_best_move(
+                    self.board, self.ai_depth, eval_func=eval_func
+                )
+            else:
+                self.human_best_move = None
+
+        # Update stats data
+        self._update_stats_data(moves)
+        # Refresh the GUI labels
+        self._update_stats_labels()
+
+    def _update_stats_data(self, moves):
+        """Calculates and updates the self.stats dictionary."""
+        # Branching factor
+        current_branching_factor = len(moves)
+        if current_branching_factor > 0:
+            self.branching_factor_history.append(current_branching_factor)
+
+        avg_branching = (
+            sum(self.branching_factor_history) / len(self.branching_factor_history)
+            if self.branching_factor_history
+            else 0
+        )
+        self.stats["branching_factor"] = current_branching_factor
+        self.stats["avg_branching_factor"] = avg_branching
+
+        # Current board evaluation
+        self.stats["current_eval"] = self.board.eval()
+
+    def _update_stats_labels(self):
+        """Updates the statistics panel labels from self.stats."""
+        self.stats_labels["ai_depth"].config(text=f"AI Depth: {self.stats['ai_depth']}")
+        self.stats_labels["branching_factor"].config(
+            text=f"Branching Factor: {self.stats['branching_factor']}"
+        )
+        self.stats_labels["avg_branching_factor"].config(
+            text=f"Avg Branching Factor: {self.stats['avg_branching_factor']:.2f}"
+        )
+        self.stats_labels["current_eval"].config(
+            text=f"Current Eval: {self.stats['current_eval']:.2f}"
+        )
+        self.stats_labels["ai_eval"].config(
+            text=f"AI Eval: {self.stats['ai_eval']:.2f}"
+        )
+        self.stats_labels["move_time"].config(
+            text=f"Last Move Time: {self.stats['move_time']:.3f}s"
+        )
+        self.stats_labels["explored_states"].config(
+            text=f"Explored States: {self.stats['explored_states']}"
+        )
 
     #  Main loop ----------
 
@@ -228,7 +416,3 @@ if __name__ == "__main__":
     # Default it is: human (red) vs AI (black)
     game = CheckersGUI(ai_enabled=True, ai_depth=10)
     game.run()
-
-    # if you want to do a human vs human game you can  do:
-    # game = CheckersGUI(ai_enabled=False)
-    # game.run()
