@@ -242,7 +242,7 @@ class CheckersGUI:
                     x1, y1, x2, y2, fill=color, outline="black", width=1
                 )
 
-                piece = self.board.board[row][col]
+                piece = self.board.get_piece(row, col)
                 if piece != " ":
                     self._draw_piece(row, col, piece)
 
@@ -338,7 +338,7 @@ class CheckersGUI:
             self._handle_select(row, col)
 
     def _handle_select(self, row: int, col: int):
-        piece = self.board.board[row][col]
+        piece = self.board.get_piece(row, col)
         if piece.lower() == self.board.to_move:
             self.selected_square = (row, col)
             self.valid_moves = self.board.get_moves_for_piece(row, col)
@@ -363,7 +363,7 @@ class CheckersGUI:
                 return
 
         # If clicked on another of your own pieces, switch selection
-        piece = self.board.board[row][col]
+        piece = self.board.get_piece(row, col)
         if piece.lower() == self.board.to_move:
             self.selected_square = (row, col)
             self.valid_moves = self.board.get_moves_for_piece(row, col)
