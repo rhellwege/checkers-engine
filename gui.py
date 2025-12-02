@@ -1,8 +1,9 @@
 import tkinter as tk
 from time import perf_counter
 
+import board
 from board import CheckersBoard
-from minimax import get_best_move
+from minimax import get_best_move, minimax
 
 
 class CheckersGUI:
@@ -27,12 +28,14 @@ class CheckersGUI:
         # --- Stats ---
         self.stats = {
             "ai_depth": self.ai_depth,
-            "branching_factor": 0,
-            "avg_branching_factor": 0.0,
+            "game_branching_factor": 0,
+            "avg_game_branching_factor": 0.0,
             "current_eval": 0.0,
             "ai_eval": 0.0,
             "move_time": 0.0,
             "explored_states": 0,
+            "cache_hits": 0,
+            "ai_search_branching_factor": 0.0,
         }
         self.branching_factor_history = []
         self.human_best_move = None
@@ -41,7 +44,9 @@ class CheckersGUI:
         self.root.title("Checkers")
         self.root.resizable(False, False)
         self.show_best_move = tk.BooleanVar()
+        self.force_capture = tk.BooleanVar(value=board.FORCED_CAPTURE)
         self.eval_function_name = tk.StringVar(value="Simple Eval")
+        self.eval_func = CheckersBoard.eval
 
         # Main frame
         main_frame = tk.Frame(self.root)
@@ -76,12 +81,20 @@ class CheckersGUI:
 
         self.stats_labels = {
             "ai_depth": tk.Label(parent, text=f"AI Depth: {self.ai_depth}"),
-            "branching_factor": tk.Label(parent, text="Branching Factor: N/A"),
-            "avg_branching_factor": tk.Label(parent, text="Avg Branching Factor: N/A"),
+            "game_branching_factor": tk.Label(
+                parent, text="Game Branching Factor: N/A"
+            ),
+            "avg_game_branching_factor": tk.Label(
+                parent, text="Avg Game Branching Factor: N/A"
+            ),
+            "ai_search_branching_factor": tk.Label(
+                parent, text="AI Search Branching Factor: N/A"
+            ),
             "current_eval": tk.Label(parent, text="Current Eval: N/A"),
             "ai_eval": tk.Label(parent, text="AI Eval: N/A"),
             "move_time": tk.Label(parent, text="Last Move Time: N/A"),
             "explored_states": tk.Label(parent, text="Explored States: N/A"),
+            "cache_hits": tk.Label(parent, text="Cache Hits: N/A"),
         }
 
         for label in self.stats_labels.values():
@@ -94,7 +107,16 @@ class CheckersGUI:
             variable=self.show_best_move,
             onvalue=True,
             offvalue=False,
-            command=self.draw_board,
+            command=self._update_and_draw,
+        ).pack(anchor="w", pady=5)
+
+        tk.Checkbutton(
+            parent,
+            text="Forced Capture",
+            variable=self.force_capture,
+            onvalue=True,
+            offvalue=False,
+            command=self._toggle_forced_capture,
         ).pack(anchor="w", pady=5)
 
         # Reset button
@@ -107,8 +129,32 @@ class CheckersGUI:
             anchor="w", pady=(10, 0)
         )
         tk.OptionMenu(
-            parent, self.eval_function_name, "Simple Eval", "Smart Eval"
+            parent,
+            self.eval_function_name,
+            "Simple Eval",
+            "Smart Eval",
+            command=self._update_eval_func,
         ).pack(anchor="w")
+
+    def _update_and_draw(self):
+        self.update_game_state()
+        self.draw_board()
+
+    def _update_eval_func(self, _=None):
+        """Updates the self.eval_func based on the dropdown selection."""
+        if self.eval_function_name.get() == "Smart Eval":
+            self.eval_func = CheckersBoard.smart_eval
+        else:
+            self.eval_func = CheckersBoard.eval
+        minimax.cache_clear()
+        # After changing the eval function, we need to re-evaluate the position
+        self._update_and_draw()
+
+    def _toggle_forced_capture(self):
+        """Toggles the FORCED_CAPTURE global in the board module."""
+        board.FORCED_CAPTURE = self.force_capture.get()
+        minimax.cache_clear()
+        self._update_and_draw()
 
     def reset_game(self):
         """Resets the game to its initial state."""
@@ -119,12 +165,14 @@ class CheckersGUI:
         # Reset stats
         self.stats = {
             "ai_depth": self.ai_depth,
-            "branching_factor": 0,
-            "avg_branching_factor": 0.0,
+            "game_branching_factor": 0,
+            "avg_game_branching_factor": 0.0,
             "current_eval": 0.0,
             "ai_eval": 0.0,
             "move_time": 0.0,
             "explored_states": 0,
+            "cache_hits": 0,
+            "ai_search_branching_factor": 0.0,
         }
         self.branching_factor_history = []
         self.human_best_move = None
@@ -152,15 +200,9 @@ class CheckersGUI:
         self.status_label.config(text="AI is thinking...")
         self.root.update_idletasks()
 
-        eval_func = (
-            CheckersBoard.smart_eval
-            if self.eval_function_name.get() == "Smart Eval"
-            else CheckersBoard.eval
-        )
-
         start_time = perf_counter()
-        ai_eval, best_move, explored_states = get_best_move(
-            self.board, self.ai_depth, eval_func=eval_func
+        ai_eval, best_move, explored_states, avg_branching_factor = get_best_move(
+            self.board, self.ai_depth, eval_func=self.eval_func
         )
         end_time = perf_counter()
 
@@ -169,6 +211,8 @@ class CheckersGUI:
             self.stats["ai_eval"] = ai_eval
             self.stats["move_time"] = end_time - start_time
             self.stats["explored_states"] = explored_states
+            self.stats["cache_hits"] = minimax.cache_info().hits
+            self.stats["ai_search_branching_factor"] = avg_branching_factor
 
         self.selected_square = None
         self.valid_moves = []
@@ -347,19 +391,24 @@ class CheckersGUI:
             winner = "Black" if self.board.to_move == "r" else "Red"
             self.status_label.config(text=f"{winner} wins!")
             self.human_best_move = None
+            self.stats["current_eval"] = 0  # Or some other terminal value
         else:
             # Pre-calculate human's best move if it's their turn
             if not self.is_ai_turn():
-                eval_func = (
-                    CheckersBoard.smart_eval
-                    if self.eval_function_name.get() == "Smart Eval"
-                    else CheckersBoard.eval
-                )
-                _, self.human_best_move, _ = get_best_move(
-                    self.board, self.ai_depth, eval_func=eval_func
-                )
+                (
+                    eval_val,
+                    self.human_best_move,
+                    explored_states,
+                    avg_branching_factor,
+                ) = get_best_move(self.board, self.ai_depth, eval_func=self.eval_func)
+                self.stats["current_eval"] = eval_val
+                self.stats["explored_states"] = explored_states
+                self.stats["cache_hits"] = minimax.cache_info().hits
+                self.stats["ai_search_branching_factor"] = avg_branching_factor
             else:
                 self.human_best_move = None
+                # When it's AI's turn, the "current eval" is from the AI's perspective
+                self.stats["current_eval"] = self.eval_func(self.board)
 
         # Update stats data
         self._update_stats_data(moves)
@@ -378,20 +427,23 @@ class CheckersGUI:
             if self.branching_factor_history
             else 0
         )
-        self.stats["branching_factor"] = current_branching_factor
-        self.stats["avg_branching_factor"] = avg_branching
+        self.stats["game_branching_factor"] = current_branching_factor
+        self.stats["avg_game_branching_factor"] = avg_branching
 
         # Current board evaluation
-        self.stats["current_eval"] = self.board.eval()
+        self.stats["current_eval"] = self.eval_func(self.board)
 
     def _update_stats_labels(self):
         """Updates the statistics panel labels from self.stats."""
         self.stats_labels["ai_depth"].config(text=f"AI Depth: {self.stats['ai_depth']}")
-        self.stats_labels["branching_factor"].config(
-            text=f"Branching Factor: {self.stats['branching_factor']}"
+        self.stats_labels["game_branching_factor"].config(
+            text=f"Game Branching Factor: {self.stats['game_branching_factor']}"
         )
-        self.stats_labels["avg_branching_factor"].config(
-            text=f"Avg Branching Factor: {self.stats['avg_branching_factor']:.2f}"
+        self.stats_labels["avg_game_branching_factor"].config(
+            text=f"Avg Game Branching Factor: {self.stats['avg_game_branching_factor']:.2f}"
+        )
+        self.stats_labels["ai_search_branching_factor"].config(
+            text=f"AI Search Branching Factor: {self.stats['ai_search_branching_factor']:.2f}"
         )
         self.stats_labels["current_eval"].config(
             text=f"Current Eval: {self.stats['current_eval']:.2f}"
@@ -404,6 +456,9 @@ class CheckersGUI:
         )
         self.stats_labels["explored_states"].config(
             text=f"Explored States: {self.stats['explored_states']}"
+        )
+        self.stats_labels["cache_hits"].config(
+            text=f"Cache Hits: {self.stats['cache_hits']}"
         )
 
     #  Main loop ----------

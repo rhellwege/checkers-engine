@@ -1,3 +1,6 @@
+FORCED_CAPTURE = False
+
+
 class Move:
     """
     Represents a move in the game, which can be a simple move or a multi-jump.
@@ -44,18 +47,13 @@ class CheckersBoard:
     def get_possible_moves(self):
         """
         Gets all legal moves (as Move objects) for the current player.
-        It enforces the mandatory jump rule.
+        It enforces the mandatory jump rule if FORCED_CAPTURE is True.
         """
-        # First check capturing moves, they are forced.
         all_jumps = []
         for r in range(8):
             for c in range(8):
                 if self.board[r][c].lower() == self.to_move:
                     all_jumps.extend(self._get_jumps_for_piece(r, c))
-
-        # If there is at least one possible jump, return now
-        if all_jumps:
-            return all_jumps
 
         all_regulars = []
         for r in range(8):
@@ -63,7 +61,13 @@ class CheckersBoard:
                 if self.board[r][c].lower() == self.to_move:
                     all_regulars.extend(self._get_regular_moves_for_piece(r, c))
 
-        return all_regulars
+        if FORCED_CAPTURE:
+            if all_jumps:
+                return all_jumps
+            else:
+                return all_regulars
+        else:
+            return all_jumps + all_regulars
 
     def get_moves_for_piece(self, r, c):
         """
