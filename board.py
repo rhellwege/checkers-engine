@@ -5,6 +5,10 @@ FORCED_CAPTURE = True
 PIECE_TO_INT = {" ": 0, "r": 1, "b": 2, "R": 3, "B": 4}
 INT_TO_PIECE = {v: k for k, v in PIECE_TO_INT.items()}
 
+WEIGHT_PIECES = 1
+WEIGHT_MOBILITY = 0.2
+WEIGHT_KING = 2
+
 
 class Move:
     """
@@ -238,10 +242,15 @@ class CheckersBoard:
                 elif piece == "b":
                     score -= 1 + r * 0.1
                 elif piece == "R":
-                    score += 3
+                    score += WEIGHT_KING
                 elif piece == "B":
-                    score -= 3
+                    score -= WEIGHT_KING
         return score
+
+    def eval_advanced(self):
+        piece_score = self.smart_eval() * WEIGHT_PIECES
+        mobility_score = len(self.get_possible_moves()) * WEIGHT_MOBILITY
+        return piece_score + mobility_score
 
 
 # for testing

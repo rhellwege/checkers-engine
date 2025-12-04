@@ -133,8 +133,30 @@ class CheckersGUI:
             self.eval_function_name,
             "Simple Eval",
             "Smart Eval",
+            "Advanced Eval",
             command=self._update_eval_func,
         ).pack(anchor="w")
+
+        # AI Depth slider
+        tk.Label(parent, text="AI Depth:", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(10, 0)
+        )
+        self.depth_scale = tk.Scale(
+            parent,
+            from_=1,
+            to=10,
+            orient=tk.HORIZONTAL,
+            variable=tk.IntVar(value=self.ai_depth),
+            command=self._update_ai_depth,
+        )
+        self.depth_scale.pack(anchor="w")
+
+    def _update_ai_depth(self, value):
+        """Updates the AI depth from the slider."""
+        self.ai_depth = int(value)
+        self.stats["ai_depth"] = self.ai_depth
+        minimax.cache_clear()
+        self._update_and_draw()
 
     def _update_and_draw(self):
         self.update_game_state()
@@ -144,6 +166,8 @@ class CheckersGUI:
         """Updates the self.eval_func based on the dropdown selection."""
         if self.eval_function_name.get() == "Smart Eval":
             self.eval_func = CheckersBoard.smart_eval
+        elif self.eval_function_name.get() == "Advanced Eval":
+            self.eval_func = CheckersBoard.eval_advanced
         else:
             self.eval_func = CheckersBoard.eval
         minimax.cache_clear()
@@ -469,5 +493,5 @@ class CheckersGUI:
 
 if __name__ == "__main__":
     # Default it is: human (red) vs AI (black)
-    game = CheckersGUI(ai_enabled=True, ai_depth=10)
+    game = CheckersGUI(ai_enabled=True, ai_depth=4)
     game.run()
