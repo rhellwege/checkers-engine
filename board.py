@@ -31,6 +31,18 @@ class Move:
         return isinstance(other, Move) and self.path == other.path
 
 
+class UndoInfo:
+    """
+    A small container to hold the information needed to undo a move.
+    """
+
+    def __init__(self, move, piece_moved, captured_pieces, was_promoted):
+        self.move = move
+        self.piece_moved = piece_moved
+        self.captured_pieces = captured_pieces
+        self.was_promoted = was_promoted
+
+
 class CheckersBoard:
     def __init__(self, board=None, to_move="r"):
         if board is None:
@@ -169,9 +181,22 @@ class CheckersBoard:
         """
         ** Assumes that move is valid **
         Executes a Move object on the board and mutates the board in place.
+        Returns an UndoInfo object to revert the move.
         """
         start_r, start_c = move.start
+        end_r, end_c = move.end
         piece = self.get_piece(start_r, start_c)
+
+        # Store info for undo
+        captured_pieces = []
+        for cap_r, cap_c in move.captured:
+            captured_pieces.append(((cap_r, cap_c), self.get_piece(cap_r, cap_c)))
+
+        was_promoted = not piece.isupper() and (
+            (piece.lower() == "r" and end_r == 0)
+            or (piece.lower() == "b" and end_r == 7)
+        )
+        undo_info = UndoInfo(move, piece, captured_pieces, was_promoted)
 
         # Remove captured pieces from the board
         for cap_r, cap_c in move.captured:
@@ -180,15 +205,37 @@ class CheckersBoard:
         # Move the piece along its path
         self.set_piece(start_r, start_c, " ")
         end_r, end_c = move.end
-        self.set_piece(end_r, end_c, piece)
 
         # Handle promotion
         if (piece.lower() == "r" and end_r == 0) or (
             piece.lower() == "b" and end_r == 7
         ):
             self.set_piece(end_r, end_c, piece.upper())
+        else:
+            self.set_piece(end_r, end_c, piece)
 
         self.to_move = "b" if self.to_move == "r" else "r"
+        return undo_info
+
+    def undo_move(self, undo_info):
+        """
+        Reverts the board to the state before the move was executed.
+        """
+        move = undo_info.move
+        start_r, start_c = move.start
+        end_r, end_c = move.end
+
+        # Switch player back
+        self.to_move = "b" if self.to_move == "r" else "r"
+
+        # Move piece back from end to start
+        # The piece to move back is the original piece, before any promotion
+        self.set_piece(start_r, start_c, undo_info.piece_moved)
+        self.set_piece(end_r, end_c, " ")  # The landing square is now empty
+
+        # Restore captured pieces
+        for (cap_r, cap_c), piece in undo_info.captured_pieces:
+            self.set_piece(cap_r, cap_c, piece)
 
     def _get_directions_for_piece(self, piece):
         # Returns the valid move directions for a given piece type.
@@ -216,6 +263,9 @@ class CheckersBoard:
 
     def __hash__(self):
         return hash((self.board.tobytes(), self.to_move))
+
+    def copy(self):
+        return CheckersBoard(self.board[:], self.to_move)
 
     def eval(self):
         score = 0

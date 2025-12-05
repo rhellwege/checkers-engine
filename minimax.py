@@ -1,4 +1,3 @@
-from copy import deepcopy
 from functools import lru_cache
 
 from board import CheckersBoard, Move
@@ -41,10 +40,9 @@ def minimax(
 
         for move in possible_moves:
             # simulate move
-            new_board = deepcopy(board)
-            new_board.execute_move(move)
-
-            evaluation, _ = minimax(new_board, depth - 1, alpha, beta, False, eval_func)
+            undo_info = board.execute_move(move)
+            evaluation, _ = minimax(board, depth - 1, alpha, beta, False, eval_func)
+            board.undo_move(undo_info)
 
             if evaluation > best_value:
                 best_value = evaluation
@@ -62,10 +60,9 @@ def minimax(
         best_move = None
 
         for move in possible_moves:
-            new_board = deepcopy(board)
-            new_board.execute_move(move)
-
-            evaluation, _ = minimax(new_board, depth - 1, alpha, beta, True, eval_func)
+            undo_info = board.execute_move(move)
+            evaluation, _ = minimax(board, depth - 1, alpha, beta, True, eval_func)
+            board.undo_move(undo_info)
 
             if evaluation < best_value:
                 best_value = evaluation
@@ -85,7 +82,6 @@ def get_best_move(board: CheckersBoard, depth: int = 5, eval_func=CheckersBoard.
     global EXPLORED_STATES, TOTAL_BRANCHES
     EXPLORED_STATES = 0
     TOTAL_BRANCHES = 0
-    # minimax.cache_clear()
 
     is_red_to_move = board.to_move == "r"
     eval, best_move = minimax(
