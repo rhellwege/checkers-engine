@@ -1,3 +1,15 @@
+import array
+
+FORCED_CAPTURE = True
+
+PIECE_TO_INT = {" ": 0, "r": 1, "b": 2, "R": 3, "B": 4}
+INT_TO_PIECE = {v: k for k, v in PIECE_TO_INT.items()}
+
+WEIGHT_PIECES = 1
+WEIGHT_MOBILITY = 0.2
+WEIGHT_KING = 2
+
+
 class Move:
     """
     Represents a move in the game, which can be a simple move or a multi-jump.
@@ -19,6 +31,18 @@ class Move:
         return isinstance(other, Move) and self.path == other.path
 
 
+class UndoInfo:
+    """
+    A small container to hold the information needed to undo a move.
+    """
+
+    def __init__(self, move, piece_moved, captured_pieces, was_promoted):
+        self.move = move
+        self.piece_moved = piece_moved
+        self.captured_pieces = captured_pieces
+        self.was_promoted = was_promoted
+
+
 class CheckersBoard:
     def __init__(self, board=None, to_move="r"):
         if board is None:
@@ -28,63 +52,68 @@ class CheckersBoard:
             self.board = board
             self.to_move = to_move
 
+    def get_piece(self, r, c):
+        return INT_TO_PIECE[self.board[r * 8 + c]]
+
+    def set_piece(self, r, c, piece):
+        self.board[r * 8 + c] = PIECE_TO_INT[piece]
+
     def _create_board(self):
-        board = [[" " for _ in range(8)] for _ in range(8)]
+        board = array.array("b", [0] * 64)
         for i in range(8):
             if i % 2 == 0:
-                board[0][i] = "b"
-                board[2][i] = "b"
-                board[6][i] = "r"
+                board[0 * 8 + i] = PIECE_TO_INT["b"]
+                board[2 * 8 + i] = PIECE_TO_INT["b"]
+                board[6 * 8 + i] = PIECE_TO_INT["r"]
             else:
-                board[1][i] = "b"
-                board[5][i] = "r"
-                board[7][i] = "r"
+                board[1 * 8 + i] = PIECE_TO_INT["b"]
+                board[5 * 8 + i] = PIECE_TO_INT["r"]
+                board[7 * 8 + i] = PIECE_TO_INT["r"]
         return board
 
     def get_possible_moves(self):
         """
         Gets all legal moves (as Move objects) for the current player.
-        It enforces the mandatory jump rule.
+        It enforces the mandatory jump rule if FORCED_CAPTURE is True.
         """
-        # First check capturing moves, they are forced.
         all_jumps = []
         for r in range(8):
             for c in range(8):
-                if self.board[r][c].lower() == self.to_move:
+                if self.get_piece(r, c).lower() == self.to_move:
                     all_jumps.extend(self._get_jumps_for_piece(r, c))
 
-        # If there is at least one possible jump, return now
-        if all_jumps:
+        if FORCED_CAPTURE and all_jumps:
             return all_jumps
 
         all_regulars = []
         for r in range(8):
             for c in range(8):
-                if self.board[r][c].lower() == self.to_move:
+                if self.get_piece(r, c).lower() == self.to_move:
                     all_regulars.extend(self._get_regular_moves_for_piece(r, c))
 
-        return all_regulars
+        if not FORCED_CAPTURE:
+            return all_jumps + all_regulars
+        else:  # FORCED_CAPTURE is true, but there were no jumps
+            return all_regulars
 
     def get_moves_for_piece(self, r, c):
         """
         Gets all possible moves (as Move objects) for a single piece.
         """
-        if self.board[r][c].lower() != self.to_move:
+        if self.get_piece(r, c).lower() != self.to_move:
             return []
 
-        # Jump moves are forced
-        jumps = self._get_jumps_for_piece(r, c)
-        if jumps:
-            return jumps
+        moves = self.get_possible_moves()
+        # filter
+        moves = [move for move in moves if move.path[0] == (r, c)]
 
-        regulars = self._get_regular_moves_for_piece(r, c)
-        return regulars
+        return moves
 
     def _get_jumps_for_piece(self, r, c):
         moves = []
         # Start the recursion with a path containing only the start position
         self._find_jump_sequences_recursive(
-            [(r, c)], [], moves, self.board[r][c].isupper()
+            [(r, c)], [], moves, self.get_piece(r, c).isupper()
         )
         return moves
 
@@ -93,7 +122,7 @@ class CheckersBoard:
     ):
         r, c = current_path[-1]
         start_r, start_c = current_path[0]
-        original_piece = self.board[start_r][start_c]
+        original_piece = self.get_piece(start_r, start_c)
 
         effective_piece = original_piece.upper() if is_king else original_piece
         directions = self._get_directions_for_piece(effective_piece)
@@ -108,8 +137,8 @@ class CheckersBoard:
                 continue
 
             if self.is_within_bounds(land_r, land_c):
-                jump_over_piece = self.board[jump_over_r][jump_over_c]
-                land_piece = self.board[land_r][land_c]
+                jump_over_piece = self.get_piece(jump_over_r, jump_over_c)
+                land_piece = self.get_piece(land_r, land_c)
 
                 # if target empty and piece jumped over is opponent
                 if land_piece == " " and jump_over_piece.lower() not in (
@@ -136,12 +165,15 @@ class CheckersBoard:
 
     def _get_regular_moves_for_piece(self, r, c):
         moves = []
-        piece = self.board[r][c]
+        piece = self.get_piece(r, c)
         directions = self._get_directions_for_piece(piece)
 
         for dr, dc in directions:
             new_r, new_c = r + dr, c + dc
-            if self.is_within_bounds(new_r, new_c) and self.board[new_r][new_c] == " ":
+            if (
+                self.is_within_bounds(new_r, new_c)
+                and self.get_piece(new_r, new_c) == " "
+            ):
                 moves.append(Move([(r, c), (new_r, new_c)]))
         return moves
 
@@ -149,26 +181,61 @@ class CheckersBoard:
         """
         ** Assumes that move is valid **
         Executes a Move object on the board and mutates the board in place.
+        Returns an UndoInfo object to revert the move.
         """
         start_r, start_c = move.start
-        piece = self.board[start_r][start_c]
+        end_r, end_c = move.end
+        piece = self.get_piece(start_r, start_c)
+
+        # Store info for undo
+        captured_pieces = []
+        for cap_r, cap_c in move.captured:
+            captured_pieces.append(((cap_r, cap_c), self.get_piece(cap_r, cap_c)))
+
+        was_promoted = not piece.isupper() and (
+            (piece.lower() == "r" and end_r == 0)
+            or (piece.lower() == "b" and end_r == 7)
+        )
+        undo_info = UndoInfo(move, piece, captured_pieces, was_promoted)
 
         # Remove captured pieces from the board
         for cap_r, cap_c in move.captured:
-            self.board[cap_r][cap_c] = " "
+            self.set_piece(cap_r, cap_c, " ")
 
         # Move the piece along its path
-        self.board[start_r][start_c] = " "
+        self.set_piece(start_r, start_c, " ")
         end_r, end_c = move.end
-        self.board[end_r][end_c] = piece
 
         # Handle promotion
         if (piece.lower() == "r" and end_r == 0) or (
             piece.lower() == "b" and end_r == 7
         ):
-            self.board[end_r][end_c] = piece.upper()
+            self.set_piece(end_r, end_c, piece.upper())
+        else:
+            self.set_piece(end_r, end_c, piece)
 
         self.to_move = "b" if self.to_move == "r" else "r"
+        return undo_info
+
+    def undo_move(self, undo_info):
+        """
+        Reverts the board to the state before the move was executed.
+        """
+        move = undo_info.move
+        start_r, start_c = move.start
+        end_r, end_c = move.end
+
+        # Switch player back
+        self.to_move = "b" if self.to_move == "r" else "r"
+
+        # Move piece back from end to start
+        # The piece to move back is the original piece, before any promotion
+        self.set_piece(start_r, start_c, undo_info.piece_moved)
+        self.set_piece(end_r, end_c, " ")  # The landing square is now empty
+
+        # Restore captured pieces
+        for (cap_r, cap_c), piece in undo_info.captured_pieces:
+            self.set_piece(cap_r, cap_c, piece)
 
     def _get_directions_for_piece(self, piece):
         # Returns the valid move directions for a given piece type.
@@ -185,21 +252,55 @@ class CheckersBoard:
         return 0 <= row < 8 and 0 <= col < 8
 
     def __str__(self):
-        return "\n".join([" ".join(row) for row in self.board])
+        lines = []
+        for r in range(8):
+            row_str = " ".join([self.get_piece(r, c) for c in range(8)])
+            lines.append(row_str)
+        return "\n".join(lines)
+
+    def __eq__(self, other):
+        return isinstance(other, CheckersBoard) and self.board == other.board
+
+    def __hash__(self):
+        return hash((self.board.tobytes(), self.to_move))
+
+    def copy(self):
+        return CheckersBoard(self.board[:], self.to_move)
 
     def eval(self):
         score = 0
-        for row in self.board:
-            for cell in row:
-                if cell == "r":
+        for r in range(8):
+            for c in range(8):
+                piece = self.get_piece(r, c)
+                if piece == "r":
                     score += 1
-                elif cell == "b":
+                elif piece == "b":
                     score -= 1
-                elif cell == "R":
+                elif piece == "R":
                     score += 3
-                elif cell == "B":
+                elif piece == "B":
                     score -= 3
         return score
+
+    def smart_eval(self):
+        score = 0
+        for r in range(8):
+            for c in range(8):
+                piece = self.get_piece(r, c)
+                if piece == "r":
+                    score += 1 + (7 - r) * 0.1
+                elif piece == "b":
+                    score -= 1 + r * 0.1
+                elif piece == "R":
+                    score += WEIGHT_KING
+                elif piece == "B":
+                    score -= WEIGHT_KING
+        return score
+
+    def eval_advanced(self):
+        piece_score = self.smart_eval() * WEIGHT_PIECES
+        mobility_score = len(self.get_possible_moves()) * WEIGHT_MOBILITY
+        return piece_score + mobility_score
 
 
 # for testing
@@ -211,6 +312,8 @@ if __name__ == "__main__":
     while True:
         print("\n\n=====================================\n\n")
         moves = board.get_possible_moves()
+        if not moves:
+            break
         board.execute_move(moves[-1])
         print(board)
         print(board.eval())
