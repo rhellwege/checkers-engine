@@ -83,7 +83,6 @@ class CheckersGUI:
         )
 
         self.stats_labels = {
-            "ai_depth": tk.Label(parent, text=f"AI Depth: {self.ai_depth}"),
             "game_branching_factor": tk.Label(
                 parent, text="Game Branching Factor: N/A"
             ),
@@ -230,7 +229,6 @@ class CheckersGUI:
 
         # Reset stats
         self.stats = {
-            "ai_depth": self.ai_depth,
             "game_branching_factor": 0,
             "avg_game_branching_factor": 0.0,
             "current_eval": 0.0,
@@ -535,7 +533,6 @@ class CheckersGUI:
 
     def _update_stats_labels(self):
         """Updates the statistics panel labels from self.stats."""
-        self.stats_labels["ai_depth"].config(text=f"AI Depth: {self.stats['ai_depth']}")
         self.stats_labels["game_branching_factor"].config(
             text=f"Game Branching Factor: {self.stats['game_branching_factor']}"
         )
