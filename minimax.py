@@ -1,4 +1,5 @@
 from functools import lru_cache
+from time import time
 
 from board import CheckersBoard, Move
 
@@ -98,3 +99,44 @@ def get_best_move(board: CheckersBoard, depth: int = 5, eval_func=CheckersBoard.
     )
 
     return eval, best_move, EXPLORED_STATES, avg_branching_factor
+
+
+def get_best_move_iddfs(
+    board: CheckersBoard, max_depth, max_dur_s, eval_func=CheckersBoard.eval
+):
+    """
+    Returns the best move for the player that is going to play using iterative deepening depth-first search.
+    Either uses max depth or max duration, whichever is reached first.
+    """
+    start_time = time()
+
+    best_move = None
+    evaluation = None
+    total_explored_states = 0
+    avg_branching_factor = 0
+    last_completed_depth = 0
+
+    for depth in range(1, max_depth + 1):
+        if time() - start_time >= max_dur_s:
+            print(
+                f"Time limit reached. Stopping search at depth {last_completed_depth}."
+            )
+            break
+
+        (
+            eval_iter,
+            move_iter,
+            explored_iter,
+            avg_branching_iter,
+        ) = get_best_move(board, depth, eval_func=eval_func)
+
+        # The results from the deepest fully searched depth are the most reliable.
+        evaluation = eval_iter
+        best_move = move_iter
+        avg_branching_factor = avg_branching_iter
+        total_explored_states += explored_iter  # a running total
+        last_completed_depth = depth
+    else:  # This runs if the loop completes without `break`.
+        print(f"Max depth of {max_depth} reached.")
+
+    return evaluation, best_move, total_explored_states, avg_branching_factor

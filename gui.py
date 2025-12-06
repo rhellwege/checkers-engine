@@ -3,7 +3,7 @@ from time import perf_counter
 
 import board
 from board import CheckersBoard
-from minimax import get_best_move, minimax
+from minimax import get_best_move, get_best_move_iddfs, minimax
 
 
 class CheckersGUI:
@@ -15,7 +15,7 @@ class CheckersGUI:
     - Human always plays red; AI (if enabled) plays black.
     """
 
-    def __init__(self, ai_enabled: bool = True, ai_depth: int = 5):
+    def __init__(self, ai_enabled: bool = True, ai_depth: int = 10):
         self.board = CheckersBoard()
         self.selected_square = None
         self.valid_moves = []
@@ -46,6 +46,9 @@ class CheckersGUI:
         self.show_best_move = tk.BooleanVar()
         self.force_capture = tk.BooleanVar(value=board.FORCED_CAPTURE)
         self.eval_function_name = tk.StringVar(value="Simple Eval")
+        self.depth_scheduler_name = tk.StringVar(value="Static")
+        self.depth_scheduler = "Static"
+        self.time_limit = 3.0
         self.eval_func = CheckersBoard.eval
 
         # Main frame
@@ -137,6 +140,17 @@ class CheckersGUI:
             command=self._update_eval_func,
         ).pack(anchor="w")
 
+        tk.Label(parent, text="Depth scheduler:", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(10, 0)
+        )
+        tk.OptionMenu(
+            parent,
+            self.depth_scheduler_name,
+            "Static",
+            "Iterative Deepening",
+            command=self._update_depth_scheduler,
+        ).pack(anchor="w")
+
         # AI Depth slider
         tk.Label(parent, text="AI Depth:", font=("Arial", 10, "bold")).pack(
             anchor="w", pady=(10, 0)
@@ -144,17 +158,45 @@ class CheckersGUI:
         self.depth_scale = tk.Scale(
             parent,
             from_=1,
-            to=10,
+            to=20,
             orient=tk.HORIZONTAL,
             variable=tk.IntVar(value=self.ai_depth),
             command=self._update_ai_depth,
         )
         self.depth_scale.pack(anchor="w")
 
+        # AI Time Limit slider
+        tk.Label(
+            parent, text="AI Time Limit (IDDFS):", font=("Arial", 10, "bold")
+        ).pack(anchor="w", pady=(10, 0))
+        self.time_limit_scale = tk.Scale(
+            parent,
+            from_=0.1,
+            to=10.0,
+            orient=tk.HORIZONTAL,
+            variable=tk.DoubleVar(value=self.time_limit),
+            bigincrement=0.1,
+            command=self._update_time_limit,
+        )
+        self.time_limit_scale.pack(anchor="w")
+
     def _update_ai_depth(self, value):
         """Updates the AI depth from the slider."""
         self.ai_depth = int(value)
         self.stats["ai_depth"] = self.ai_depth
+        minimax.cache_clear()
+        self._update_and_draw()
+
+    def _update_depth_scheduler(self, value):
+        """Updates the depth scheduler from the dropdown."""
+        self.depth_scheduler = value
+        minimax.cache_clear()
+        self._update_and_draw()
+
+    def _update_time_limit(self, value):
+        """Updates the AI time limit from the slider."""
+        self.time_limit = float(value)
+        self.stats["ai_time_limit"] = self.time_limit
         minimax.cache_clear()
         self._update_and_draw()
 
@@ -225,9 +267,22 @@ class CheckersGUI:
         self.root.update_idletasks()
 
         start_time = perf_counter()
-        ai_eval, best_move, explored_states, avg_branching_factor = get_best_move(
-            self.board, self.ai_depth, eval_func=self.eval_func
+        ai_eval, best_move, explored_states, avg_branching_factor = (
+            None,
+            None,
+            None,
+            None,
         )
+        if self.depth_scheduler == "Static":
+            ai_eval, best_move, explored_states, avg_branching_factor = get_best_move(
+                self.board, self.ai_depth, eval_func=self.eval_func
+            )
+        elif self.depth_scheduler == "Iterative Deepening":
+            ai_eval, best_move, explored_states, avg_branching_factor = (
+                get_best_move_iddfs(
+                    self.board, self.ai_depth, self.time_limit, eval_func=self.eval_func
+                )
+            )
         end_time = perf_counter()
 
         if best_move is not None:
@@ -424,7 +479,28 @@ class CheckersGUI:
                     self.human_best_move,
                     explored_states,
                     avg_branching_factor,
-                ) = get_best_move(self.board, self.ai_depth, eval_func=self.eval_func)
+                ) = None, None, None, None
+                if self.depth_scheduler == "Static":
+                    (
+                        eval_val,
+                        self.human_best_move,
+                        explored_states,
+                        avg_branching_factor,
+                    ) = get_best_move(
+                        self.board, self.ai_depth, eval_func=self.eval_func
+                    )
+                elif self.depth_scheduler == "Iterative Deepening":
+                    (
+                        eval_val,
+                        self.human_best_move,
+                        explored_states,
+                        avg_branching_factor,
+                    ) = get_best_move_iddfs(
+                        self.board,
+                        self.ai_depth,
+                        self.time_limit,
+                        eval_func=self.eval_func,
+                    )
                 self.stats["current_eval"] = eval_val
                 self.stats["explored_states"] = explored_states
                 self.stats["cache_hits"] = minimax.cache_info().hits
