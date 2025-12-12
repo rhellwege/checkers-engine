@@ -30,6 +30,7 @@ def play_game(eval_func_r, eval_func_b, depth_r, depth_b, max_moves=150):
             _, best_move = minimax(
                 board, depth_r, float("-inf"), float("inf"), True, eval_func_r
             )
+            minimax.cache_clear()
             duration = time.time() - start_time
             total_time_r += duration
             moves_r += 1
@@ -38,6 +39,7 @@ def play_game(eval_func_r, eval_func_b, depth_r, depth_b, max_moves=150):
             _, best_move = minimax(
                 board, depth_b, float("-inf"), float("inf"), False, eval_func_b
             )
+            minimax.cache_clear()
             duration = time.time() - start_time
             total_time_b += duration
             moves_b += 1
@@ -69,7 +71,7 @@ def main():
         "advanced": CheckersBoard.eval_advanced,
     }
 
-    depth = 5
+    depth = 6
     num_games = 10
 
     print(
@@ -103,7 +105,7 @@ def main():
                     eval1, eval2, depth, depth
                 )
                 print(
-                    f"  Game {game_num + 1}: Winner: {winner.upper()} Moves: {moves_b} Total Time: {total_time_r + total_time_b}"
+                    f"  Game {game_num + 1}: Winner: {winner.upper()} Moves: {moves_b + moves_r} Total Time: {total_b + total_r}"
                 )
 
                 if winner == "r":

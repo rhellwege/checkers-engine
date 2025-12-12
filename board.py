@@ -303,14 +303,12 @@ class CheckersBoard:
         mobility_score = len(self.get_possible_moves()) * WEIGHT_MOBILITY
         # count starting pieces:
         starting_pieces = 0
-        if self.to_move == "r":
-            for i in range(8):
-                if self.get_piece(i, 0) == "r" or self.get_piece(i, 0) == "R":
-                    starting_pieces += 1
-        elif self.to_move == "b":
-            for i in range(8):
-                if self.get_piece(i, 7) == "b" or self.get_piece(i, 7) == "B":
-                    starting_pieces += 1
+        for i in range(8):
+            if self.get_piece(7, i) == "r" or self.get_piece(7, i) == "R":
+                starting_pieces += 1
+        for i in range(8):
+            if self.get_piece(0, i) == "b" or self.get_piece(0, i) == "B":
+                starting_pieces -= 1
         starter_score = starting_pieces * WEIGHT_STARTING_PIECES
         return piece_score + mobility_score + starter_score
 
