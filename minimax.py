@@ -1,4 +1,4 @@
-from functools import lru_cache
+import random
 from time import time
 
 from board import CheckersBoard, Move
@@ -9,7 +9,7 @@ EXPLORED_STATES = 0
 TOTAL_BRANCHES = 0
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
 def minimax(
     board: CheckersBoard,
     depth: int,
@@ -37,7 +37,7 @@ def minimax(
     # maximizing player (r)
     if maximizing:
         best_value = float("-inf")
-        best_move = None
+        best_moves = []
 
         for move in possible_moves:
             # simulate move
@@ -47,18 +47,21 @@ def minimax(
 
             if evaluation > best_value:
                 best_value = evaluation
-                best_move = move
+                best_moves = [move]
+            elif evaluation == best_value:
+                best_moves.append(move)
+
             # alpha-beta pruning for efficiency
             alpha = max(alpha, best_value)
             if beta <= alpha:
                 break
 
-        return best_value, best_move
+        return best_value, random.choice(best_moves) if best_moves else None
 
     # minimizing player (b)
     else:
         best_value = float("inf")
-        best_move = None
+        best_moves = []
 
         for move in possible_moves:
             undo_info = board.execute_move(move)
@@ -67,13 +70,15 @@ def minimax(
 
             if evaluation < best_value:
                 best_value = evaluation
-                best_move = move
+                best_moves = [move]
+            elif evaluation == best_value:
+                best_moves.append(move)
 
             beta = min(beta, best_value)
             if beta <= alpha:
                 break
 
-        return best_value, best_move
+        return best_value, random.choice(best_moves) if best_moves else None
 
 
 def get_best_move(board: CheckersBoard, depth: int = 5, eval_func=CheckersBoard.eval):

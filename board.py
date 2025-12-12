@@ -6,7 +6,8 @@ PIECE_TO_INT = {" ": 0, "r": 1, "b": 2, "R": 3, "B": 4}
 INT_TO_PIECE = {v: k for k, v in PIECE_TO_INT.items()}
 
 WEIGHT_PIECES = 1
-WEIGHT_MOBILITY = 0.2
+WEIGHT_MOBILITY = 0.3
+WEIGHT_STARTING_PIECES = 0.1
 WEIGHT_KING = 2
 
 
@@ -300,7 +301,18 @@ class CheckersBoard:
     def eval_advanced(self):
         piece_score = self.smart_eval() * WEIGHT_PIECES
         mobility_score = len(self.get_possible_moves()) * WEIGHT_MOBILITY
-        return piece_score + mobility_score
+        # count starting pieces:
+        starting_pieces = 0
+        if self.to_move == "r":
+            for i in range(8):
+                if self.get_piece(i, 0) == "r" or self.get_piece(i, 0) == "R":
+                    starting_pieces += 1
+        elif self.to_move == "b":
+            for i in range(8):
+                if self.get_piece(i, 7) == "b" or self.get_piece(i, 7) == "B":
+                    starting_pieces += 1
+        starter_score = starting_pieces * WEIGHT_STARTING_PIECES
+        return piece_score + mobility_score + starter_score
 
 
 # for testing
