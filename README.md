@@ -14,3 +14,7 @@ Or using uv:
 ```
 uv run gui.py
 ```
+
+# Statistics:
+
+statistics.py contains the code for collecting simulated game data for using game win percentages as a heuristic.

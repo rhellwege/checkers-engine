@@ -1,4 +1,5 @@
 import random
+from functools import lru_cache
 from time import time
 
 from board import CheckersBoard, Move
@@ -9,7 +10,7 @@ EXPLORED_STATES = 0
 TOTAL_BRANCHES = 0
 
 
-# @lru_cache(maxsize=None)
+@lru_cache(maxsize=None)
 def minimax(
     board: CheckersBoard,
     depth: int,

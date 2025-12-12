@@ -7,7 +7,7 @@ INT_TO_PIECE = {v: k for k, v in PIECE_TO_INT.items()}
 
 WEIGHT_PIECES = 1
 WEIGHT_MOBILITY = 0.3
-WEIGHT_STARTING_PIECES = 0.1
+WEIGHT_STARTING_PIECES = 0.05
 WEIGHT_KING = 2
 
 
@@ -278,9 +278,9 @@ class CheckersBoard:
                 elif piece == "b":
                     score -= 1
                 elif piece == "R":
-                    score += 3
+                    score += WEIGHT_KING
                 elif piece == "B":
-                    score -= 3
+                    score -= WEIGHT_KING
         return score
 
     def smart_eval(self):
