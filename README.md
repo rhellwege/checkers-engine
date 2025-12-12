@@ -33,8 +33,13 @@ CPSC 481 Group Project - KingMaker Checkers Engine
 * **uv.lock**
 
 ## Libraries Used
-* **array** - Used in board.py for memory efficiency. Link: https://docs.python.org/3/library/array.html
-* **tkinter** - Used in gui.py to build the GUI for the checkers board. Link: https://docs.python.org/3/library/tkinter.html
-* **perf_counter (time)** - Used in gui.py to measure AI response time. Link: https://docs.python.org/3/library/time.html
-* **lru_cache (functools)** - Used in minimax.py to cache results from minimax func. More computationally efficient than other options. Link: https://docs.python.org/3/library/functools.html
-* **time (time)** - Used in minimax.py to enforce time limit in IDDFS search. Link: https://docs.python.org/3/library/time.html
+* **array** - Used in board.py for memory efficiency. 
+   * Link: https://docs.python.org/3/library/array.html
+* **tkinter** - Used in gui.py to build the GUI for the checkers board. 
+   * Link: https://docs.python.org/3/library/tkinter.html
+* **perf_counter (time)** - Used in gui.py to measure AI response time. 
+   * Link: https://docs.python.org/3/library/time.html
+* **lru_cache (functools)** - Used in minimax.py to cache results from minimax func. More computationally efficient than other options. 
+   * Link: https://docs.python.org/3/library/functools.html
+* **time (time)** - Used in minimax.py to enforce time limit in IDDFS search. 
+   * Link: https://docs.python.org/3/library/time.html
