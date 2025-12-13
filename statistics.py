@@ -71,8 +71,8 @@ def main():
         "advanced": CheckersBoard.eval_advanced,
     }
 
-    depth = 6
-    num_games = 10
+    depth = 8
+    num_games = 100
 
     print(
         f"Running simulations with search depth {depth} for {num_games} games per matchup."
