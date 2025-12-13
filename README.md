@@ -1,4 +1,4 @@
-# checkers-engine
+
 CPSC 481 Group Project - KingMaker Checkers Engine
 ## Directions
 1. Make sure you have Python installed.
@@ -43,3 +43,16 @@ CPSC 481 Group Project - KingMaker Checkers Engine
    * Link: https://docs.python.org/3/library/functools.html
 * **time (time)** - Used in minimax.py to enforce time limit in IDDFS search. 
    * Link: https://docs.python.org/3/library/time.html
+
+# How to Run
+```
+python3 -m gui.py
+```
+Or using uv:
+```
+uv run gui.py
+```
+
+# Statistics:
+
+statistics.py contains the code for collecting simulated game data for using game win percentages as a heuristic.
